@@ -66,12 +66,12 @@
           import grpc
           import pydub
           import argparse
-
+  
           import yandex.cloud.ai.tts.v3.tts_pb2 as tts_pb2
           import yandex.cloud.ai.tts.v3.tts_service_pb2_grpc as tts_service_pb2_grpc
 
 
-          def synthesize(iam_token, text) -> pydub.AudioSegment:
+          def synthesize(iam_token, text, folderid) -> pydub.AudioSegment:
               request = tts_pb2.UtteranceSynthesisRequest(
                   text=text,
                   output_audio_spec=tts_pb2.AudioFormatOptions(
@@ -79,17 +79,19 @@
                           container_audio_type=tts_pb2.ContainerAudio.WAV
                       )
                   ),
-                  loudness_normalization_type=tts_pb2.UtteranceSynthesisRequest.LUFS
+                  loudness_normalization_type=tts_pb2.UtteranceSynthesisRequest.LUFS,
+                  hints=[tts_pb2.Hints(voice='filipp')]
               )
-    
+
               # Установить соединение с сервером.
               cred = grpc.ssl_channel_credentials()
-              channel = grpc.secure_channel('tts.{{ api-host }}:443', cred)
+              channel = grpc.secure_channel('tts.api.cloud.yandex.net:443', cred)
               stub = tts_service_pb2_grpc.SynthesizerStub(channel)
-
+  
               # Отправить данные для синтеза.
               it = stub.UtteranceSynthesis(request, metadata=(
                   ('authorization', f'Bearer {iam_token}'),
+                  ('x-folder-id', f'{folderid}')
               ))
 
               # Собрать аудиозапись по чанкам.
@@ -109,9 +111,10 @@
               parser.add_argument('--token', required=True, help='IAM token')
               parser.add_argument('--text', required=True, help='Text for synthesis')
               parser.add_argument('--output', required=True, help='Output file')
+              parser.add_argument('--folderid', required=True, help='Folder ID')
               args = parser.parse_args()
-    
-              audio = synthesize(args.token, args.text)
+
+              audio = synthesize(args.token, args.text, args.folderid)
               with open(args.output, 'wb') as fp:
                   audio.export(fp, format='wav')
           ```
