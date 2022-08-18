@@ -66,12 +66,12 @@
           import grpc
           import pydub
           import argparse
-
+          
           import yandex.cloud.ai.tts.v3.tts_pb2 as tts_pb2
           import yandex.cloud.ai.tts.v3.tts_service_pb2_grpc as tts_service_pb2_grpc
-
-
-          def synthesize(iam_token, text) -> pydub.AudioSegment:
+          
+          
+          def synthesize(iam_token, text, folderid) -> pydub.AudioSegment:
               request = tts_pb2.UtteranceSynthesisRequest(
                   text=text,
                   output_audio_spec=tts_pb2.AudioFormatOptions(
@@ -79,19 +79,21 @@
                           container_audio_type=tts_pb2.ContainerAudio.WAV
                       )
                   ),
-                  loudness_normalization_type=tts_pb2.UtteranceSynthesisRequest.LUFS
+                  loudness_normalization_type=tts_pb2.UtteranceSynthesisRequest.LUFS,
+                  hints=[tts_pb2.Hints(voice='john')]
               )
-    
+          
               # Установить соединение с сервером.
               cred = grpc.ssl_channel_credentials()
-              channel = grpc.secure_channel('tts.{{ api-host }}:443', cred)
+              channel = grpc.secure_channel('tts.api.cloud.yandex.net:443', cred)
               stub = tts_service_pb2_grpc.SynthesizerStub(channel)
-
+          
               # Отправить данные для синтеза.
               it = stub.UtteranceSynthesis(request, metadata=(
                   ('authorization', f'Bearer {iam_token}'),
+                  ('x-folder-id', f'{folderid}')
               ))
-
+          
               # Собрать аудиозапись по чанкам.
               try:
                   audio = io.BytesIO()
@@ -102,18 +104,20 @@
               except grpc._channel._Rendezvous as err:
                   print(f'Error code {err._state.code}, message: {err._state.details}')
                   raise err
-
-
+          
+          
           if __name__ == '__main__':
               parser = argparse.ArgumentParser()
               parser.add_argument('--token', required=True, help='IAM token')
               parser.add_argument('--text', required=True, help='Text for synthesis')
               parser.add_argument('--output', required=True, help='Output file')
+              parser.add_argument('--folderid', required=True, help='Folder ID')
               args = parser.parse_args()
-    
-              audio = synthesize(args.token, args.text)
+          
+              audio = synthesize(args.token, args.text, args.folderid)
               with open(args.output, 'wb') as fp:
                   audio.export(fp, format='wav')
+          
           ```
    
       1. Задайте IAM-токен сервисного аккаунта, текст для синтеза, имя аудиофайла и выполните созданный файл:
@@ -121,7 +125,8 @@
           ```bash
           export IAM_TOKEN=<IAM-токен_сервисного_аккаунта>
           export TEXT='Я Яндекс Спичк+ит. Я могу превратить любой текст в речь. Теперь и в+ы — можете!'
-          python output/test.py --token ${IAM_TOKEN} --output speech.wav --text ${TEXT}
+          export FOLDERID=<Идетификатор вашего каталога>
+          python output/test.py --token ${IAM_TOKEN} --output speech.wav --text ${TEXT} --foderid ${FOLDERID}
           ```
 
           В результате в директории `cloudapi` будет создан файл `speech.wav` с синтезированной речью.
